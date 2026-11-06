@@ -235,11 +235,13 @@ describe("Modern Frontend Router & Navigation Architecture", () => {
     vi.stubGlobal("scrollTo", vi.fn());
     vi.stubGlobal(
       "ResizeObserver",
-      vi.fn().mockImplementation(() => ({
-        observe: vi.fn(),
-        unobserve: vi.fn(),
-        disconnect: vi.fn()
-      }))
+      vi.fn(function () {
+        return {
+          observe: vi.fn(),
+          unobserve: vi.fn(),
+          disconnect: vi.fn()
+        };
+      })
     );
     window.HTMLElement.prototype.scrollIntoView = vi.fn();
     window.Element.prototype.scrollIntoView = vi.fn();
