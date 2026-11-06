@@ -1,416 +1,115 @@
-# FlowDesk
+# Wabrix AI
 
-**FlowDesk** is an enterprise-grade WhatsApp automation SaaS platform. It enables organizations to manage multi-channel WhatsApp inboxes, automate agent routing, run AI-powered bots, and ingest a knowledge base — all from a unified, multi-tenant workspace.
+**A shared WhatsApp inbox with AI-assisted replies, backed by a durable PostgreSQL message pipeline.**
 
----
+Support teams can connect WhatsApp Business numbers, route incoming conversations to queues and agents, and draft replies from their workspace knowledge base. The backend verifies and stores incoming webhooks before acknowledging them, then lets workers handle normalization, routing, AI, and delivery.
 
-## Tech Stack
+[Product preview](#product-preview) · [Architecture](#architecture) · [Run locally](#run-locally) · [Testing](#testing)
 
-### Frontend
+This repository contains the **React, Express, and PostgreSQL implementation**, previously named FlowDesk AI. The [original Wabrix repository](https://github.com/ryanakml/wabrix) addresses the same product problem with a separate Next.js, Convex, Clerk, and Cloudflare Workers implementation.
 
-| Layer        | Technology                            |
-| ------------ | ------------------------------------- |
-| Framework    | React 19                              |
-| Routing      | TanStack Router (file-based)          |
-| Server state | TanStack Query                        |
-| Tables       | TanStack Table                        |
-| Build tool   | Vite 7 + Tailwind CSS v4              |
-| Real-time    | Socket.IO client                      |
-| Charts       | Recharts                              |
-| Components   | shadcn/ui + Radix UI + Lucide React   |
-| Testing      | Vitest + Testing Library + Playwright |
+## Product workflows
 
-### Backend
+| Workflow            | What the application supports                                                                                                                                           |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connect WhatsApp    | Connect a WhatsApp Business Account through Meta Embedded Signup when configured, or enter credentials manually. Manage channels and sync approved templates.           |
+| Triage and reply    | Work from a live inbox with queues, assignments, tags, internal notes, and delivery status. Use approved templates when the WhatsApp service window has closed.         |
+| Assist with AI      | Ingest knowledge sources, retrieve relevant chunks, and review or edit drafted replies. Optional automatic replies depend on workspace policy and runtime safety gates. |
+| Operate a workspace | Invite teammates, assign roles, review audit activity, and inspect conversation, SLA, and workload analytics.                                                           |
+| Integrate           | Create scoped API keys and subscribe to signed developer webhooks.                                                                                                      |
 
-| Layer                 | Technology                                          |
-| --------------------- | --------------------------------------------------- |
-| Runtime               | Node.js 22 (ESM)                                    |
-| API framework         | Express 5                                           |
-| Language              | TypeScript 5 (strict)                               |
-| Schema validation     | Zod                                                 |
-| ORM / DB access       | Prisma (raw SQL migrations via `pg`)                |
-| Database              | PostgreSQL 16 + pgvector                            |
-| Queue                 | PostgreSQL transactional outbox polling             |
-| Real-time transport   | Socket.IO + Redis adapter                           |
-| Query embedding cache | Optional tenant-scoped Redis cache in the AI worker |
-| Object storage        | S3-compatible (MinIO locally, AWS S3 in prod)       |
-| Malware scanning      | ClamAV                                              |
-| Auth                  | OIDC (session-based)                                |
-| Observability         | OpenTelemetry + Prometheus + Grafana + pino         |
-| Monorepo              | Turborepo + pnpm workspaces                         |
-| CI quality gate       | Prettier · ESLint · tsc · Vitest · OpenAPI check    |
+## Product preview
 
-### AI / LLM
+![Wabrix AI inbox with a conversation list and an open thread](apps/web/public/landing-dashboard-dark.webp)
 
-| Layer               | Technology                                         |
-| ------------------- | -------------------------------------------------- |
-| Chat providers      | Google Gemini · OpenAI (swappable via adapter)     |
-| Embedding providers | Gemini Embedding · OpenAI Embedding                |
-| Vector search       | pgvector (cosine similarity, stored in PostgreSQL) |
-| RAG pipeline        | Chunk → Embed → Store → Retrieve → Prompt          |
-
-### Infrastructure
-
-| Layer            | Technology                                     |
-| ---------------- | ---------------------------------------------- |
-| Containerization | Docker + Docker Compose (local)                |
-| IaC              | Terraform (`infra/terraform`)                  |
-| Orchestration    | Kubernetes (`infra/deploy`)                    |
-| Email (local)    | Mailpit                                        |
-| Tracing          | OpenTelemetry Collector → Prometheus → Grafana |
-
----
-
-## How It Works — Full Workflow
-
-### 1. Inbound message (WhatsApp → FlowDesk)
-
-```
-WhatsApp Cloud API
-       │  POST /webhook  (HMAC-SHA256 signed)
-       ▼
-  ┌─────────────┐
-  │   Ingress   │  verifies Meta signature · writes raw event to
-  │  :4001      │  outbox table (PostgreSQL) · returns 200 immediately
-  └─────────────┘
-       │  outbox row (status = pending)
-       ▼
-  ┌─────────────┐
-  │   Worker    │  polls outbox every 1 s
-  │  :4002      │
-  │             │
-  │  normalize  │  maps WhatsApp payload → internal Conversation + Message
-  │  route      │  evaluates routing rules (hours, SLA, tags, team load)
-  │  dispatch   │  assigns to human agent  ──OR──  bot queue
-  └─────────────┘
-```
-
-**Normalization** converts the raw Meta webhook payload into typed `Conversation` and `Message` records, resolving the phone number to the correct WhatsApp channel and tenant.
-
-**Routing** is a pure-function engine in `@flowdesk/domain`. It evaluates, in order:
-
-- Service-window check (business hours per channel)
-- SLA deadlines and escalation thresholds
-- Routing rules (keyword match, contact tag, round-robin, least-loaded)
-- Auto-release gate (reopens bot-handled conversations for human review when confidence is low)
-
----
-
-### 2. Bot pipeline (AI-assisted replies)
-
-```
-  Worker receives bot-queue item
-       │
-       ▼
-  ┌────────────────────┐
-  │   bot-drafts job   │
-  │                    │
-  │  1. retrieve docs  │  pgvector similarity search on knowledge base
-  │  2. build prompt   │  injects retrieved chunks + conversation history
-  │  3. call LLM       │  Gemini or OpenAI chat completion
-  │  4. safety check   │  @flowdesk/security AI safety guardrails
-  │  5. store draft    │  saved to DB with confidence score
-  └────────────────────┘
-       │
-       ▼
-  ┌─────────────────────┐
-  │  auto-send gate     │  checks confidence >= threshold
-  │                     │  checks automation safety policy (org-level)
-  │                     │  checks killswitch flag
-  └─────────────────────┘
-       │                │
-  confidence OK     confidence LOW
-       │                │
-       ▼                ▼
-  send via         surface draft to
-  WhatsApp API     human agent in Inbox
-```
-
----
-
-### 3. Outbound message (agent or auto-send → WhatsApp)
-
-```
-  API receives send request  (human agent or auto-send trigger)
-       │
-       ▼
-  outbox row (status = pending, direction = outbound)
-       │
-       ▼
-  Worker dispatch job
-  │
-  ├── text message   → MetaWhatsAppProvider.sendTextMessage()
-  ├── template       → MetaWhatsAppProvider.sendTemplateMessage()
-  └── media          → upload to S3 → MetaWhatsAppProvider.sendMediaMessage()
-       │
-       ▼
-  WhatsApp Cloud API delivers to end-user
-       │
-       ▼
-  Status webhook (delivered / read / failed)
-  → Ingress → outbox → Worker → updates message status in DB
-  → Socket.IO broadcast → Web frontend updates in real-time
-```
-
----
-
-### 4. Media lifecycle
-
-```
-Agent uploads file via API
-       │
-       ▼
-  ClamAV scan (via Worker media-scanner job)
-  │
-  ├── CLEAN   → S3/MinIO  → presigned URL served to clients
-  └── INFECTED → rejected, attachment marked rejected in DB
-
-Retention job (hourly via Worker)
-  → deletes S3 objects older than retention policy
-  → marks DB attachment as expired
-```
-
----
-
-### 5. Knowledge base ingestion (RAG)
-
-```
-Agent uploads document via Knowledge screen
-       │
-       ▼
-  API stores raw document in DB (status = pending)
-       │
-       ▼
-  Worker knowledge-ingestion job
-  │
-  ├── extract text content   (@flowdesk/providers knowledge-extractor)
-  ├── chunk text             (configurable chunk size + overlap)
-  ├── generate embeddings    (Gemini or OpenAI embedding model)
-  └── store vectors          (pgvector in PostgreSQL)
-
-Bot pipeline reads vectors at query time
-  → pgvector cosine similarity → top-k chunks → injected into LLM prompt
-```
-
----
-
-### 6. Real-time updates (Web frontend)
-
-```
-API emits Socket.IO event on conversation/message change
-       │
-       ▼
-  Socket.IO server (Redis adapter for multi-instance pub/sub)
-       │
-       ▼
-  Web frontend (socket.io-client)
-  → TanStack Query cache invalidation
-  → Inbox view re-renders with new message / status
-```
-
----
-
-### 7. Developer webhooks (external integrations)
-
-```
-Conversation event occurs (new message, status change, assignment)
-       │
-       ▼
-  Worker webhook-dispatch job
-  │
-  ├── resolves active subscriptions for the org
-  ├── signs payload (HMAC-SHA256)
-  └── HTTP POST to subscriber endpoint
-       │
-       ▼
-  Retry with exponential backoff on failure
-  Dead-letter after max attempts
-```
-
----
-
-### 8. Analytics aggregation
-
-```
-Scheduler (every 60 s)
-       │
-       ▼
-  runAnalyticsAggregationJob
-  → SQL aggregation across all tenants
-  → writes time-bucketed metrics rows
-  → served by API /analytics endpoints → Recharts in frontend
-```
-
----
+_Local capture of the React UI using a mock API and synthetic conversations. The [original Wabrix site](https://wabrix.nylo.me/) is a separate application._
 
 ## Architecture
 
-This is a **Turborepo monorepo** with two top-level namespaces:
+Wabrix AI is a [modular monolith with separate process roles](docs/adr/001-modular-monolith-process-roles.md). The web app, REST API, webhook ingress, worker, and scheduler live in a pnpm/Turborepo workspace. PostgreSQL stores application state and durable work.
 
-### Apps
+```mermaid
+sequenceDiagram
+    participant Meta as WhatsApp Cloud API
+    participant Ingress as Express ingress
+    participant DB as PostgreSQL
+    participant Worker as Background worker
+    participant API as Express API
+    participant Inbox as React inbox
 
-| App         | Port | Description                                                                   |
-| ----------- | ---- | ----------------------------------------------------------------------------- |
-| `web`       | 3000 | React SPA — inbox, channels, knowledge, analytics, developer settings         |
-| `api`       | 4000 | Express REST API — auth, conversations, routing, bots, attachments, analytics |
-| `ingress`   | 4001 | WhatsApp Cloud API webhook receiver                                           |
-| `worker`    | 4002 | Outbox poller — normalization, dispatch, bot-drafts, auto-send, media         |
-| `scheduler` | 4003 | Interval runner — analytics aggregation                                       |
+    Meta->>Ingress: POST /webhooks/whatsapp
+    Ingress->>Ingress: Verify signature against raw body
+    Ingress->>DB: Store webhook and enqueue work for known channel
+    DB-->>Ingress: Commit
+    Ingress-->>Meta: 200 (503 if persistence fails)
+    Worker->>DB: Claim work, normalize message or status, route
+    Inbox->>API: Load thread or submit a reply
+    API->>DB: Read inbox or commit outbound intent and outbox event
+    Worker->>DB: Claim outbound event
+    Worker->>Meta: Submit message or template
+    Meta-->>Ingress: Delivery status webhook
+    API-->>Inbox: Socket.IO invalidation hints
+```
 
-### Packages
+### Webhook reliability and message delivery
 
-| Package                   | Description                                                                                                                |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `@flowdesk/db`            | Prisma client + typed data-access layer (conversations, orgs, channels, knowledge, auth, routing, webhooks)                |
-| `@flowdesk/domain`        | Pure business logic — routing rules, auto-release gate, auto-send policy, SLA, permissions, production-release gating, RAG |
-| `@flowdesk/providers`     | Adapters — WhatsApp Cloud API, Gemini/OpenAI chat+embeddings, S3 storage, OIDC identity, ClamAV                            |
-| `@flowdesk/contracts`     | Zod-validated TypeScript schemas; source of truth for the OpenAPI spec                                                     |
-| `@flowdesk/security`      | Rate limiting, OIDC sessions, request signing, SSRF protection, field encryption, AI safety guardrails                     |
-| `@flowdesk/observability` | OTel tracing, Prometheus metrics, pino structured logging, PII redaction                                                   |
-| `@flowdesk/config`        | Typed env-var configuration for every service                                                                              |
-| `@flowdesk/ui`            | Shared design system (shadcn/ui components, Tailwind CSS tokens)                                                           |
-| `@flowdesk/testkit`       | Shared test utilities, factories, and mock providers                                                                       |
+- **Durable intake.** [Ingress](apps/ingress/src/app.ts) validates Meta's HMAC-SHA256 signature before parsing the body. With PostgreSQL configured, [persistence](packages/db/src/webhooks.ts) deduplicates by provider and SHA-256 hash of the raw body. A new event for a known channel and its outbox entry are committed together. The request returns HTTP 503 if persistence fails so Meta can retry.
+- **Transactional outbox.** The API records outbound intent and enqueues work in PostgreSQL in the same transaction. Workers claim batches with `FOR UPDATE SKIP LOCKED`, apply bounded retries and backoff, and dead-letter terminal failures. Ingress deduplication and outbound idempotency keys protect different boundaries; a network timeout at the provider is still ambiguous. See the [outbox and recovery runbook](docs/runbooks/whatsapp-outbox-dlq.md) and [vertical slice integration tests](apps/worker/src/vertical-slice.integration.test.ts).
+- **Delivery and realtime state.** The worker dispatches WhatsApp text, templates, or media. Status webhooks flow through the same ingress and update stored message state. The API uses Socket.IO to signal clients to refetch inbox data; Redis can relay those signals between API instances.
 
-### Infrastructure (local Docker Compose)
+### AI, media, and tenant operations
 
-| Service               | Port        | Purpose                                           |
-| --------------------- | ----------- | ------------------------------------------------- |
-| PostgreSQL + pgvector | 5433        | Primary database + vector similarity search       |
-| Redis                 | 6379        | Socket.IO adapter; optional query embedding cache |
-| MinIO                 | 9000 / 9001 | S3-compatible object store for attachments        |
-| ClamAV                | 3310        | Malware scanning                                  |
-| Mailpit               | 8025        | Local SMTP + email inspector                      |
-| OTel Collector        | 4317 / 4318 | Trace and metric ingestion                        |
-| Prometheus            | 9090        | Metrics scraping                                  |
-| Grafana               | 3001        | Dashboards                                        |
+- **Knowledge and AI.** Ingestion jobs extract and chunk source content, call a Gemini or OpenAI embedding adapter, and store vectors in pgvector. The draft worker retrieves relevant chunks and adds them to the conversation prompt. [Automatic sending](apps/worker/src/auto-send.ts) checks confidence, the WhatsApp service window, safety policy, budget and rate limits, and whether a human has already taken over.
+- **Two Redis roles.** Redis backs Socket.IO broadcasts across API instances. An independent, opt-in [query embedding cache](docs/runbooks/query-embedding-cache.md) uses tenant-scoped keys and falls back to the embedding provider on cache failures. PostgreSQL owns durable work in both cases.
+- **Media.** Attachments use an S3-compatible store, with [quarantine and ClamAV scanning](docs/runbooks/media-quarantine.md) before access and retention cleanup afterward.
+- **Tenant operations.** OIDC sessions, workspace roles, and [PostgreSQL row-level security](docs/adr/002-postgresql-rls-tenant-boundary.md) enforce access. The scheduler aggregates analytics per tenant. The worker delivers signed developer webhooks with retry and dead-letter handling.
 
-### Redis Roles & Query Embedding Cache
+## Stack and repository layout
 
-Redis 7.x serves two distinct, decoupled purposes in FlowDesk:
+| Area                  | Code and tools                                                                                                                                                                                                                                                     |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Web                   | [`apps/web`](apps/web) — React 19, Vite, TanStack Router/Query/Table, Tailwind CSS, Radix UI, Recharts                                                                                                                                                             |
+| HTTP                  | [`apps/api`](apps/api) and [`apps/ingress`](apps/ingress) — Node.js 22, strict TypeScript, Express 5, Zod, OIDC sessions, Socket.IO                                                                                                                                |
+| Background processing | [`apps/worker`](apps/worker) for durable jobs; [`apps/scheduler`](apps/scheduler) for periodic analytics aggregation                                                                                                                                               |
+| Data and contracts    | [`packages/db`](packages/db) — PostgreSQL 16, pgvector, `pg` queries and SQL migrations; Prisma schema for data modeling. [`packages/contracts`](packages/contracts) contains Zod schemas and the OpenAPI generator.                                               |
+| Shared packages       | [`packages`](packages) — domain policies, WhatsApp/AI/storage provider adapters, security, configuration, observability, shared UI, and test fixtures                                                                                                              |
+| Local infrastructure  | [`infra/compose`](infra/compose) — Docker Compose, Redis, MinIO, ClamAV, Mailpit, OpenTelemetry Collector, Prometheus and Grafana; application logs use pino                                                                                                       |
+| Deployment reference  | [`infra/docker`](infra/docker), [`infra/deploy`](infra/deploy), and [`infra/terraform`](infra/terraform) — service images, a [single-host Compose staging runbook](docs/runbooks/single-host-staging.md), and AWS/ECS reference infrastructure and release tooling |
 
-1. **Real-time Pub/Sub (`api` service):**
-   - Socket.IO cluster broadcast adapter (`@socket.io/redis-adapter`) for distributing live inbox projection invalidation hints across API nodes.
-2. **Tenant-Scoped Query Embedding Cache (`worker` service):**
-   - Caches query embeddings generated during AI bot draft runs to reduce redundant embedding API calls and lower LLM provider latency and costs.
-   - **Tenant Isolation:** Keys are strictly tenant-isolated and hashed with SHA-256 (`fd:{env}:query-embedding:v1:{orgHash}:{identity}:{inputHash}`); raw tenant IDs and customer queries are never stored in plain text.
-   - **Atomic Admission Control:** Managed by an atomic Lua script (`FILL`) with a sorted-set index tracking entry expiration against `QUERY_EMBEDDING_CACHE_MAX_ENTRIES`.
-   - **Resilience & Fail-Open:** If Redis disconnects, errors, or times out (`QUERY_EMBEDDING_CACHE_TIMEOUT_MS`), the worker automatically bypasses the cache and calls the AI embedding provider directly. A 5-second cooldown circuit prevents connection storms.
-   - **Opt-in & Configuration:**
+The repository retains `@flowdesk/*` package names, the `flowdesk` database schema, and existing integration identifiers for compatibility.
 
-| Variable                            | Type    | Default | Description                                                                      |
-| ----------------------------------- | ------- | ------- | -------------------------------------------------------------------------------- |
-| `QUERY_EMBEDDING_CACHE_ENABLED`     | boolean | `false` | Enable query embedding cache in worker                                           |
-| `REDIS_URL`                         | string  | —       | Redis connection URL (`redis://` or `rediss://`, required when cache is enabled) |
-| `QUERY_EMBEDDING_CACHE_NAMESPACE`   | string  | `v1`    | Cache partition namespace (bumping invalidates active cache)                     |
-| `QUERY_EMBEDDING_CACHE_TTL_SECONDS` | number  | `86400` | Base TTL in seconds (automatically jittered ±10% to prevent stampedes)           |
-| `QUERY_EMBEDDING_CACHE_TIMEOUT_MS`  | number  | `100`   | Redis command timeout deadline before graceful fallback                          |
-| `QUERY_EMBEDDING_CACHE_MAX_ENTRIES` | number  | `1000`  | Maximum admitted cached vector entries per environment                           |
+## Run locally
 
-For operational runbooks and design details, see [Query Embedding Cache Runbook](docs/runbooks/query-embedding-cache.md) and [Redis Architecture Plan](docs/architecture/redis-upgrade-plan-id.md).
-
----
-
-## Web Application
-
-The frontend is a Vite + React 19 SPA using TanStack Router (file-based routing) and TanStack Query for all server state.
-
-| Screen        | What it does                                                                                     |
-| ------------- | ------------------------------------------------------------------------------------------------ |
-| **Inbox**     | Live conversation list, message thread, SSE updates, bot-draft preview, assignment panel, labels |
-| **Channels**  | WhatsApp Business Account setup, phone number management, Meta Embedded Signup, template library |
-| **Knowledge** | Document upload, ingestion status, knowledge-base management for AI context                      |
-| **Analytics** | Conversation volume, SLA adherence, bot deflection rate, team performance — time-series charts   |
-| **Team**      | Member management, role assignment, invitation flow                                              |
-| **Developer** | API key management, webhook subscriptions, payload inspector                                     |
-| **Settings**  | Workspace config, branding, notification preferences                                             |
-
----
-
-## Prerequisites
-
-- Node.js 22 (managed via `.node-version` / `.nvmrc`)
-- pnpm 10 via [Corepack](https://nodejs.org/api/corepack.html)
-- Docker Desktop or Docker Engine with Compose v2
-- GNU Make
-
----
-
-## Local Development
+Requires **Node.js 22** (see `.nvmrc`), **pnpm 10**, **Docker with Compose v2**, and **Make**.
 
 ```bash
-# 1. Activate Node.js version
+git clone https://github.com/ryanakml/wabrix-ai.git
+cd wabrix-ai
 nvm use
-
-# 2. Install dependencies & copy env template
 make bootstrap
-
-# 3. Start Docker services + all apps in watch mode
+make compose-up
+make db-migrate
 make dev
 ```
 
-`make bootstrap` — runs `corepack enable`, `pnpm install --frozen-lockfile`, and `cp .env.example .env` (skipped if `.env` already exists).
+`make bootstrap` installs from the lockfile and copies [`.env.example`](.env.example) to `.env` if needed. Wait for local PostgreSQL to become healthy before migrating. The sample environment enables local mock sign-in and mock AI. Real OIDC, WhatsApp, and AI provider calls require their own credentials and settings; see the [configuration guide](docs/delivery/CONFIGURATION.md) and [Meta signup runbook](docs/runbooks/meta-embedded-signup.md).
 
-`make dev` — brings up the full Docker Compose stack, then runs all apps in parallel via Turborepo watch mode.
+| Service                      | Default local address                                |
+| ---------------------------- | ---------------------------------------------------- |
+| Web, API, ingress            | `localhost:3000`, `localhost:4000`, `localhost:4001` |
+| Worker and scheduler health  | `localhost:4002`, `localhost:4003`                   |
+| PostgreSQL and Redis         | `localhost:5433`, `localhost:6379`                   |
+| MinIO API and console        | `localhost:9000`, `localhost:9001`                   |
+| Mailpit, Prometheus, Grafana | `localhost:8025`, `localhost:9090`, `localhost:3001` |
 
-### Service URLs
+Use `make compose-down` to stop local services. Use `make db-reset` only for disposable local data; it wipes and recreates the local database volume. See the [migration runbook](docs/runbooks/database-migrations.md).
 
-| Service          | URL                   |
-| ---------------- | --------------------- |
-| Web              | http://localhost:3000 |
-| API              | http://localhost:4000 |
-| Ingress          | http://localhost:4001 |
-| Worker health    | http://localhost:4002 |
-| Scheduler health | http://localhost:4003 |
-| Grafana          | http://localhost:3001 |
-| Prometheus       | http://localhost:9090 |
-| Mailpit          | http://localhost:8025 |
-| MinIO Console    | http://localhost:9001 |
-
-### Database
+## Testing
 
 ```bash
-make db-migrate   # run pending migrations
-make db-reset     # wipe + re-seed local DB (requires APP_ENV=local)
+make verify                          # format, OpenAPI drift, lint, types, tests, and build
+pnpm --filter @flowdesk/web test      # web component and route tests
+pnpm --filter @flowdesk/web test:e2e  # Playwright browser tests (install a browser first)
 ```
 
-`make db-reset` only operates on the named local Compose volume and is intentionally blocked outside `APP_ENV=local`.
-
----
-
-## Key Commands
-
-```bash
-make verify       # format check · openapi check · lint · typecheck · test · build
-make test         # run all unit + integration tests
-make lint         # ESLint
-make typecheck    # tsc --noEmit across all packages
-make build        # full Turborepo build
-make compose-up   # start Docker services only
-make compose-down # stop Docker services
-make clean        # remove all build artifacts and caches
-```
-
-Build a single service image:
-
-```bash
-docker build -f infra/docker/Dockerfile.node --build-arg APP=api -t flowdesk/api:local .
-```
-
----
-
-## Development Workflow
-
-- Commits follow [Conventional Commits](https://www.conventionalcommits.org/) enforced by `commitlint`.
-- Code is formatted with **Prettier** and linted with **ESLint** (typescript-eslint flat config).
-- OpenAPI spec is generated from `@flowdesk/contracts` Zod schemas and checked in CI (`pnpm openapi:check`).
-- Unit and integration tests run with **Vitest**. E2E / browser tests use **Playwright**.
-- All checks (format, openapi, lint, typecheck, test, build) must pass before merging — `make verify`.
-- Credentials in `.env.example` are synthetic and must never be reused outside local development.
-
----
-
-## Lines of Code
-
-**~79,000 lines** across all TypeScript and CSS source files (excluding lock files, generated files, build artifacts, and test snapshots).
-
-Query embedding cache configuration, invalidation, failure behavior, and verification: [runbook](docs/runbooks/query-embedding-cache.md). Disabled by default.
+Vitest covers signature validation, webhook deduplication, routing, delivery retries, tenant isolation, and AI policy. PostgreSQL and Redis integration cases require the corresponding test services and environment variables; see the [testing guide](docs/delivery/TESTING.md) and [CI configuration](.github/workflows/ci.yml). See [contributing](CONTRIBUTING.md) and the [OpenAPI specification](docs/api/openapi.json) for developer workflow and API details.

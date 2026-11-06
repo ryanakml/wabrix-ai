@@ -156,7 +156,7 @@ export function ChannelCard({
                 <dt className="text-[10px] text-muted-foreground">Connected on</dt>
                 <dd
                   className="mt-1 text-foreground"
-                  title="Date this channel was added to FlowDesk"
+                  title="Date this channel was added to Wabrix AI"
                 >
                   {Number.isNaN(date.getTime()) ? (
                     "—"

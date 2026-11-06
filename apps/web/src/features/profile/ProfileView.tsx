@@ -30,7 +30,7 @@ export function ProfileView() {
         <CardHeader>
           <CardTitle>Account</CardTitle>
           <CardDescription>
-            Identity and access information for your FlowDesk account.
+            Identity and access information for your Wabrix AI account.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -63,7 +63,7 @@ export function ProfileView() {
       <ConfirmDialog
         open={showLogoutConfirm}
         onOpenChange={setShowLogoutConfirm}
-        title="Log out of FlowDesk?"
+        title="Log out of Wabrix AI?"
         description="Your current session will end on this device. You can sign in again at any time."
         confirmLabel="Logout"
         pending={loggingOut}

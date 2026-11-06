@@ -20,7 +20,7 @@ describe("App UI Shell (M1-07)", () => {
     globalThis.fetch = vi.fn<typeof fetch>().mockImplementation(() => new Promise(() => {}));
 
     render(<App />);
-    expect(await screen.findByText("Loading FlowDesk…")).toBeTruthy();
+    expect(await screen.findByText("Loading Wabrix AI…")).toBeTruthy();
     expect(screen.getByText("Verifying secure tenant session")).toBeTruthy();
   });
 
@@ -44,6 +44,6 @@ describe("App UI Shell (M1-07)", () => {
     expect(
       (await screen.findAllByRole("heading", { name: /Turn every customer message/i })).length
     ).toBeGreaterThan(0);
-    expect(screen.getAllByRole("link", { name: /Open FlowDesk/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /Open Wabrix AI/i }).length).toBeGreaterThan(0);
   });
 });

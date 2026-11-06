@@ -8,15 +8,15 @@ const steps = [
     id: "meta-app",
     title: "Open your Meta app",
     description:
-      "Sign in to Meta for Developers and choose the app used for your FlowDesk WhatsApp connection. Open the WhatsApp setup area; Meta may label it API Setup or Getting Started.",
+      "Sign in to Meta for Developers and choose the app used for your Wabrix AI WhatsApp connection. Open the WhatsApp setup area; Meta may label it API Setup or Getting Started.",
     detail:
-      "Use the same app your workspace administrator configured for the FlowDesk webhook. If you do not have app or business access, ask the administrator to grant it before continuing."
+      "Use the same app your workspace administrator configured for the Wabrix AI webhook. If you do not have app or business access, ask the administrator to grant it before continuing."
   },
   {
     id: "phone-number",
     title: "Copy the Phone Number ID",
     description:
-      "Select the business phone number you want to connect in the WhatsApp setup area. Copy its Phone Number ID into the matching FlowDesk field.",
+      "Select the business phone number you want to connect in the WhatsApp setup area. Copy its Phone Number ID into the matching Wabrix AI field.",
     detail:
       "This is a numeric identifier, not the phone number customers dial. Check that you selected the intended business number, especially if the app also has a test number."
   },
@@ -24,7 +24,7 @@ const steps = [
     id: "business-account",
     title: "Copy the WhatsApp Business Account ID",
     description:
-      "Find the WhatsApp Business Account ID for that number in the app setup area or WhatsApp Manager. Paste it into WABA ID in FlowDesk.",
+      "Find the WhatsApp Business Account ID for that number in the app setup area or WhatsApp Manager. Paste it into WABA ID in Wabrix AI.",
     detail:
       "The WABA ID and Phone Number ID must belong together. Your Meta business portfolio ID and app ID are different identifiers; do not paste either of those here."
   },
@@ -38,11 +38,11 @@ const steps = [
   },
   {
     id: "verify",
-    title: "Verify and connect in FlowDesk",
+    title: "Verify and connect in Wabrix AI",
     description:
       "Return to the connection dialog, choose a recognizable channel name such as Customer Support, and fill all four fields. Select Verify and connect.",
     detail:
-      "FlowDesk checks the token and account, subscribes the app to the WABA, and stores the credential encrypted. After the channel appears, use Test connection to check API access. Send a real message from another WhatsApp number to confirm it reaches your Inbox."
+      "Wabrix AI checks the token and account, subscribes the app to the WABA, and stores the credential encrypted. After the channel appears, use Test connection to check API access. Send a real message from another WhatsApp number to confirm it reaches your Inbox."
   }
 ];
 
@@ -63,7 +63,7 @@ export function WhatsAppGuide() {
           Connect your WhatsApp Business account
         </h1>
         <p className="text-sm leading-relaxed text-muted-foreground">
-          Find the credentials for your account, then bring them back to FlowDesk. Keep the
+          Find the credentials for your account, then bring them back to Wabrix AI. Keep the
           connection dialog open in your other tab while you follow these steps.
         </p>
       </header>
@@ -73,7 +73,7 @@ export function WhatsAppGuide() {
           {[
             "Access to your Meta app and business portfolio",
             "A WhatsApp Business Account and business phone number",
-            "Permission to manage channels in FlowDesk",
+            "Permission to manage channels in Wabrix AI",
             "Your workspace's WhatsApp webhook already configured"
           ].map((text) => (
             <li key={text} className="flex items-start gap-2">

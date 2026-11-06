@@ -1,6 +1,6 @@
-# Contributing to FlowDesk
+# Contributing to Wabrix AI
 
-FlowDesk uses Node.js 22, pnpm 10, strict TypeScript, ESM, and a protected `main` branch. Start with `make bootstrap`, then use `make dev`; run `make verify` before opening a pull request.
+Wabrix AI uses Node.js 22, pnpm 10, strict TypeScript, ESM, and a protected `main` branch. Follow the [local setup](README.md#run-locally), then run `make verify` before opening a pull request.
 
 Create a story with explicit acceptance criteria and cross-cutting impact before implementation. Use conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`), keep pull requests independently reviewable, and include test, rollout, rollback, security, observability, and documentation evidence using the PR template.
 

@@ -50,7 +50,7 @@ export function ConnectWhatsAppDialog({
         <DialogHeader className="space-y-1 text-left">
           <DialogTitle className="text-base">Connect WhatsApp</DialogTitle>
           <DialogDescription className="pr-3 text-xs leading-relaxed">
-            Use credentials from the same Meta App configured for the FlowDesk webhook. The access
+            Use credentials from the same Meta App configured for the Wabrix AI webhook. The access
             token is never returned by the API.
           </DialogDescription>
         </DialogHeader>
