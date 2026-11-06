@@ -385,8 +385,8 @@ export function DeveloperSettingsView({
               </button>
             </div>
             <CardDescription className="text-xs text-warning-foreground">
-              Signing secret for {generatedWebhookSecret.name}. Copy it now; FlowDesk will only show
-              the masked value later.
+              Signing secret for {generatedWebhookSecret.name}. Copy it now; Wabrix AI will only
+              show the masked value later.
             </CardDescription>
           </CardHeader>
           <CardContent className="pt-0">
@@ -435,7 +435,7 @@ export function DeveloperSettingsView({
               <CardTitle className="text-base mb-1">No API keys yet</CardTitle>
               <span className="sr-only">No API keys created yet.</span>
               <CardDescription className="mb-4">
-                Create a scoped API key to access FlowDesk programmatically.
+                Create a scoped API key to access Wabrix AI programmatically.
               </CardDescription>
               {canManage && (
                 <Button
@@ -553,7 +553,7 @@ export function DeveloperSettingsView({
               </CardTitle>
               <CardDescription className="mb-4">
                 Receive instant HTTP POST callbacks when messages or conversations are created in
-                FlowDesk.
+                Wabrix AI.
               </CardDescription>
               {canManage && (
                 <Button

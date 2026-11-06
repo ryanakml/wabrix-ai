@@ -18,7 +18,7 @@ export function Breadcrumbs() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   const getCrumbs = (): Crumb[] => {
-    const base: Crumb[] = [{ label: "FlowDesk", href: "/inbox" }];
+    const base: Crumb[] = [{ label: "Wabrix AI", href: "/inbox" }];
 
     if (pathname === "/inbox") {
       base.push({ label: "Inbox" });

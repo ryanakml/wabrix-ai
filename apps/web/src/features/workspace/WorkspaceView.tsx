@@ -40,7 +40,7 @@ export function WorkspaceView() {
                 Isolated Tenant
               </Badge>
             </div>
-            <CardDescription>Verified workspace boundary within FlowDesk.</CardDescription>
+            <CardDescription>Verified workspace boundary within Wabrix AI.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
             <div className="space-y-1">

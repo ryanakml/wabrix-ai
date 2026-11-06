@@ -78,17 +78,17 @@ function RootComponent() {
 
   // Synchronize document title on route transitions
   useEffect(() => {
-    let title = "FlowDesk";
-    if (pathname.startsWith("/inbox")) title = "FlowDesk — Inbox";
-    else if (pathname.startsWith("/analytics")) title = "FlowDesk — Analytics";
-    else if (pathname.startsWith("/knowledge")) title = "FlowDesk — AI Knowledge";
-    else if (pathname === "/channels/guide") title = "FlowDesk — WhatsApp Setup Guide";
-    else if (pathname.startsWith("/channels")) title = "FlowDesk — WhatsApp Channels";
-    else if (pathname.startsWith("/developer")) title = "FlowDesk — Developer APIs";
-    else if (pathname.startsWith("/team")) title = "FlowDesk — Team Settings";
-    else if (pathname.startsWith("/audit")) title = "FlowDesk — Audit Log";
-    else if (pathname.startsWith("/profile")) title = "FlowDesk — Profile";
-    else if (pathname.startsWith("/settings/workspace")) title = "FlowDesk — Workspace";
+    let title = "Wabrix AI";
+    if (pathname.startsWith("/inbox")) title = "Wabrix AI — Inbox";
+    else if (pathname.startsWith("/analytics")) title = "Wabrix AI — Analytics";
+    else if (pathname.startsWith("/knowledge")) title = "Wabrix AI — AI Knowledge";
+    else if (pathname === "/channels/guide") title = "Wabrix AI — WhatsApp Setup Guide";
+    else if (pathname.startsWith("/channels")) title = "Wabrix AI — WhatsApp Channels";
+    else if (pathname.startsWith("/developer")) title = "Wabrix AI — Developer APIs";
+    else if (pathname.startsWith("/team")) title = "Wabrix AI — Team Settings";
+    else if (pathname.startsWith("/audit")) title = "Wabrix AI — Audit Log";
+    else if (pathname.startsWith("/profile")) title = "Wabrix AI — Profile";
+    else if (pathname.startsWith("/settings/workspace")) title = "Wabrix AI — Workspace";
     document.title = title;
   }, [pathname]);
 
@@ -109,7 +109,7 @@ function RootComponent() {
               <circle cx="12" cy="12" r="10" strokeDasharray="32" strokeDashoffset="16" />
             </svg>
           </div>
-          <h2 className="login-title">Loading FlowDesk…</h2>
+          <h2 className="login-title">Loading Wabrix AI…</h2>
           <p className="login-subtitle">Verifying secure tenant session</p>
         </div>
       </div>

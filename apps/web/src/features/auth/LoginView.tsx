@@ -1,14 +1,14 @@
 import * as React from "react";
-import { FlowDeskIcon } from "../../components/layout/AppSidebar.js";
+import { WabrixIcon } from "../../components/layout/AppSidebar.js";
 
 export function LoginView() {
   return (
     <div className="login-wrap">
       <div className="glass-card login-card">
         <div className="login-icon" style={{ background: "transparent", border: "none" }}>
-          <FlowDeskIcon size={40} />
+          <WabrixIcon size={40} />
         </div>
-        <h1 className="login-title">FlowDesk</h1>
+        <h1 className="login-title">Wabrix AI</h1>
         <p className="login-subtitle">AI-first customer operations platform</p>
         <a
           href="/api/v1/auth/login"
