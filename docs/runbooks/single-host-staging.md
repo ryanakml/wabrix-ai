@@ -148,7 +148,7 @@ application containers back.
 
 ## Rollback and recovery
 
-If the release health gate fails, `deploy.sh` restores the previous SHA for application containers. Database migrations are not rolled back automatically: migrations are expand-compatible and recovery uses a compensating roll-forward migration. The operator can manually redeploy the recorded previous SHA:
+If the release health gate fails, `deploy.sh` restores the application containers using the previous release's own Compose manifest and SHA. Database migrations are not rolled back automatically: migrations are expand-compatible and recovery uses a compensating roll-forward migration. The operator can manually redeploy the recorded previous SHA:
 
 ```bash
 previous=$(cat /opt/flowdesk/shared/previous-image)
@@ -157,3 +157,11 @@ cd "/opt/flowdesk/releases/${previous}"
 ```
 
 Named volumes are deliberately retained across application rollback and `docker compose down`. Never use `down --volumes` in this environment. Before real staging data is accepted, enable EC2/EBS snapshots and add independently tested PostgreSQL and MinIO backup/restore jobs. A snapshot is not a substitute for an application-consistent, separately stored restore test.
+
+## GHCR cutover
+
+New releases use `ghcr.io/ryanakml/wabrix-<service>:<40-character SHA>` for web, API, ingress, worker, scheduler, and migrator. The `flowdesk-staging` Compose project, named volumes, credentials, and paths under `/opt/flowdesk` stay in place. Keep the current and previous release directories: a legacy Compose manifest still uses the original image names.
+
+The CI workflow's **Publish to GHCR without deploying** dispatch is opt-in. A non-main ref publishes `candidate-<SHA>` tags for inspection; staging and production release inputs require bare commit SHAs. An approved dispatch on `main` can publish bare SHA tags without staging. A normal push to `main` still publishes images and can deploy to staging.
+
+Before removing any legacy package, inventory the running staging images, both recorded staging releases, the production stable and canary ECS task definitions and rollback revisions, and any external consumers. Move or retire their old references and verify that the replacement release and recovery images can be pulled by digest. A historical deployment record or an unreachable host does not prove the package is unused. Keep the six legacy packages until that evidence and explicit deletion approval are available.

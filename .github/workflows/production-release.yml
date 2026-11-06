@@ -7,6 +7,14 @@ on:
         description: "Immutable 40-character Git commit SHA verified in staging"
         required: true
         type: string
+      image_family:
+        description: "Use flowdesk only for a verified release from before the registry migration"
+        required: true
+        default: "wabrix"
+        type: choice
+        options:
+          - wabrix
+          - flowdesk
       canary_initial_weight:
         description: "Initial Canary traffic percentage (5 or 25)"
         required: true
@@ -20,6 +28,10 @@ permissions:
   contents: read
   id-token: write
   packages: read
+
+env:
+  IMAGE_FAMILY: ${{ inputs.image_family }}
+  RELEASE_SOURCE_SHA: ${{ inputs.source_sha }}
 
 concurrency:
   group: production-release
@@ -37,9 +49,16 @@ jobs:
         with:
           ref: ${{ github.event.inputs.source_sha }}
 
+      - name: Check out registry verification tools from the workflow revision
+        uses: actions/checkout@1af3b93b6815bc44a9784bd300feb67ff0d1eeb3 # v6.0.0
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: .release-tools
+          persist-credentials: false
+
       - name: Validate Immutable SHA (Reject Mutable Tags)
         run: |
-          SHA="${{ github.event.inputs.source_sha }}"
+          SHA="$RELEASE_SOURCE_SHA"
           echo "Validating release tag / commit SHA: ${SHA}"
           if [[ ! "${SHA}" =~ ^[0-9a-f]{40}$ ]]; then
             echo "::error::Release SHA '${SHA}' is invalid. Production releases strictly require an immutable 40-character commit SHA."
@@ -54,15 +73,14 @@ jobs:
         env:
           GHCR_TOKEN: ${{ github.token }}
         run: |
-          SHA="${{ github.event.inputs.source_sha }}"
+          SHA="$RELEASE_SOURCE_SHA"
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
-          chmod +x infra/deploy/production/verify-provenance.sh
-          ./infra/deploy/production/verify-provenance.sh "${SHA}" "artifacts/provenance/image-digests.json"
+          bash .release-tools/infra/deploy/production/verify-provenance.sh "${SHA}" "artifacts/provenance/image-digests.json" "${IMAGE_FAMILY}"
 
       - name: Upload Verified Image Digests
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
-          name: flowdesk-image-digests-${{ github.event.inputs.source_sha }}
+          name: wabrix-image-digests-${{ github.event.inputs.source_sha }}
           path: artifacts/provenance/image-digests.json
           retention-days: 90
 
@@ -73,13 +91,12 @@ jobs:
 
       - name: Generate Real SPDX-2.3 SBOM
         run: |
-          chmod +x infra/deploy/production/generate-sbom.sh
-          ./infra/deploy/production/generate-sbom.sh "${{ github.event.inputs.source_sha }}"
+          bash .release-tools/infra/deploy/production/generate-sbom.sh "$RELEASE_SOURCE_SHA"
 
       - name: Upload SBOM Artifact
         uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4.6.0
         with:
-          name: flowdesk-sbom-${{ github.event.inputs.source_sha }}
+          name: wabrix-sbom-${{ github.event.inputs.source_sha }}
           path: artifacts/sbom/
           retention-days: 90
 
@@ -98,7 +115,7 @@ jobs:
       - name: Download Verified Image Digests
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
-          name: flowdesk-image-digests-${{ github.event.inputs.source_sha }}
+          name: wabrix-image-digests-${{ github.event.inputs.source_sha }}
           path: artifacts/provenance/
 
       - name: Configure AWS Credentials via OIDC
@@ -191,7 +208,7 @@ jobs:
       - name: Download Verified Image Digests
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
-          name: flowdesk-image-digests-${{ github.event.inputs.source_sha }}
+          name: wabrix-image-digests-${{ github.event.inputs.source_sha }}
           path: artifacts/provenance/
 
       - name: Configure AWS Credentials via OIDC
@@ -263,7 +280,7 @@ jobs:
       - name: Download Verified Image Digests
         uses: actions/download-artifact@fa0a91b85d4f404e444e00e005971372dc801d16 # v4.1.8
         with:
-          name: flowdesk-image-digests-${{ github.event.inputs.source_sha }}
+          name: wabrix-image-digests-${{ github.event.inputs.source_sha }}
           path: artifacts/provenance/
 
       - name: Configure AWS Credentials via OIDC

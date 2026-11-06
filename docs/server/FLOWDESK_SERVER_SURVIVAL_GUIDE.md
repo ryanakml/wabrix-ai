@@ -955,9 +955,9 @@ docker ps --filter 'name=flowdesk-staging-' \
 Pola image yang pernah digunakan:
 
 ```text
-ghcr.io/ryanakml/flowdesk-api:<git-sha>
-ghcr.io/ryanakml/flowdesk-web:<git-sha>
-ghcr.io/ryanakml/flowdesk-worker:<git-sha>
+ghcr.io/ryanakml/wabrix-api:<git-sha>
+ghcr.io/ryanakml/wabrix-web:<git-sha>
+ghcr.io/ryanakml/wabrix-worker:<git-sha>
 ```
 
 Contoh Git SHA/release:

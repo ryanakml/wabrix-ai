@@ -4,6 +4,8 @@ This runbook documents the operational procedure for automated traffic rollback 
 
 ---
 
+The production workflow resolves all six images in one family. Use `wabrix` for new releases and select `flowdesk` only when promoting a previously verified legacy SHA. Existing ECS task definitions and deployment records keep their original digest references; retain those images until the rollback targets have moved.
+
 ## 1. Automated Application & Compute Rollback Principle
 
 FlowDesk uses an **expand-contract** deployment model combined with weighted canary traffic shifting and immutable container image digest pinning on AWS ECS Fargate:

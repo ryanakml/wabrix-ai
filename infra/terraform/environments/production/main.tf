@@ -59,10 +59,10 @@ variable "canary_weight" {
 
 variable "bootstrap_image_digest" {
   type        = string
-  description = "Immutable pinned sha256 image digest for production bootstrap (e.g. ghcr.io/ryanakml/flowdesk-api@sha256:<64-hex>). Mutable tags (:latest, etc.) are strictly prohibited."
+  description = "Immutable pinned sha256 image digest for production bootstrap (e.g. ghcr.io/ryanakml/wabrix-api@sha256:<64-hex>). Mutable tags (:latest, etc.) are strictly prohibited."
   validation {
-    condition     = can(regex("^ghcr\\.io/ryanakml/flowdesk-api@sha256:[0-9a-f]{64}$", var.bootstrap_image_digest))
-    error_message = "bootstrap_image_digest must be an immutable pinned digest matching 'ghcr.io/ryanakml/flowdesk-api@sha256:<64-hex-chars>'. Mutable tags like :latest are prohibited."
+    condition     = can(regex("^ghcr\\.io/ryanakml/(wabrix|flowdesk)-api@sha256:[0-9a-f]{64}$", var.bootstrap_image_digest))
+    error_message = "bootstrap_image_digest must be an immutable pinned digest from ghcr.io/ryanakml/wabrix-api (or flowdesk-api for a retained legacy release). Mutable tags like :latest are prohibited."
   }
 }
 
