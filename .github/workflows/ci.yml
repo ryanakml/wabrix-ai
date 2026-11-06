@@ -7,6 +7,11 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
+      publish_registry_images:
+        description: "Publish to GHCR without deploying (release SHA on main, candidate-<SHA> on other refs)"
+        required: false
+        default: false
+        type: boolean
       run_failure_probe:
         description: "Prove a deliberate failure blocks the workflow"
         required: false
@@ -62,6 +67,7 @@ jobs:
         run: |
           bash -n infra/deploy/single-host/*.sh
           ./infra/deploy/single-host/test-health-check.sh
+          ./infra/deploy/single-host/test-registry-migration.sh
           IMAGE_TAG=0000000000000000000000000000000000000000 \
             docker compose --env-file infra/deploy/single-host/environment.example \
             -f infra/deploy/single-host/compose.yaml config -q
@@ -123,7 +129,11 @@ jobs:
           docker buildx build \
             --file infra/docker/Dockerfile.node \
             --build-arg APP=${{ matrix.workspace }} \
-            --tag flowdesk/${{ matrix.app }}:${{ github.sha }} \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.title=Wabrix AI ${{ matrix.app }}" \
+            --label "org.opencontainers.image.description=Wabrix AI ${{ matrix.app }} service container" \
+            --tag wabrix/${{ matrix.app }}:${{ github.sha }} \
             --cache-from type=gha,scope=flowdesk-${{ matrix.app }} \
             --cache-to type=gha,mode=max,scope=flowdesk-${{ matrix.app }} \
             --load \
@@ -135,18 +145,28 @@ jobs:
             -e PORT=${{ matrix.port }} \
             -e ENCRYPTION_KEY=ci-image-smoke-encryption-key \
             -p ${{ matrix.port }}:${{ matrix.port }} \
-            flowdesk/${{ matrix.app }}:${{ github.sha }}
+            wabrix/${{ matrix.app }}:${{ github.sha }}
           for attempt in {1..30}; do curl --fail --silent http://127.0.0.1:${{ matrix.port }}/livez && exit 0; sleep 1; done
           docker logs app
           exit 1
-      - name: Publish immutable image
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      - name: Publish Wabrix image
+        if: >-
+          github.repository == 'ryanakml/wabrix-ai' &&
+          ((github.event_name == 'push' && github.ref == 'refs/heads/main') ||
+          (github.event_name == 'workflow_dispatch' && inputs.publish_registry_images && !inputs.run_failure_probe))
         env:
           GHCR_TOKEN: ${{ github.token }}
+          IMAGE_APP: ${{ matrix.app }}
         run: |
           printf '%s' "$GHCR_TOKEN" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
-          docker tag flowdesk/${{ matrix.app }}:${{ github.sha }} ghcr.io/ryanakml/flowdesk-${{ matrix.app }}:${{ github.sha }}
-          docker push ghcr.io/ryanakml/flowdesk-${{ matrix.app }}:${{ github.sha }}
+          image_tag=$GITHUB_SHA
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            image_tag="candidate-$GITHUB_SHA"
+          fi
+          image_ref="ghcr.io/ryanakml/wabrix-${IMAGE_APP}:${image_tag}"
+          docker tag "wabrix/${IMAGE_APP}:${GITHUB_SHA}" "$image_ref"
+          docker push "$image_ref"
+          docker buildx imagetools inspect "$image_ref" --format '{{json .Manifest}}'
 
   database-foundation:
     runs-on: ubuntu-24.04

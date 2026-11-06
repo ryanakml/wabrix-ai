@@ -116,16 +116,16 @@ process.exit(0);
 
 describe("Production Deployment Scripts Integration Tests (M5-07 / #181, #203, #205)", () => {
   const sampleDigests = {
-    web: "ghcr.io/ryanakml/flowdesk-web@sha256:1111111111111111111111111111111111111111111111111111111111111111",
-    api: "ghcr.io/ryanakml/flowdesk-api@sha256:2222222222222222222222222222222222222222222222222222222222222222",
+    web: "ghcr.io/ryanakml/wabrix-web@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    api: "ghcr.io/ryanakml/wabrix-api@sha256:2222222222222222222222222222222222222222222222222222222222222222",
     ingress:
-      "ghcr.io/ryanakml/flowdesk-ingress@sha256:3333333333333333333333333333333333333333333333333333333333333333",
+      "ghcr.io/ryanakml/wabrix-ingress@sha256:3333333333333333333333333333333333333333333333333333333333333333",
     worker:
-      "ghcr.io/ryanakml/flowdesk-worker@sha256:4444444444444444444444444444444444444444444444444444444444444444",
+      "ghcr.io/ryanakml/wabrix-worker@sha256:4444444444444444444444444444444444444444444444444444444444444444",
     scheduler:
-      "ghcr.io/ryanakml/flowdesk-scheduler@sha256:5555555555555555555555555555555555555555555555555555555555555555",
+      "ghcr.io/ryanakml/wabrix-scheduler@sha256:5555555555555555555555555555555555555555555555555555555555555555",
     migrator:
-      "ghcr.io/ryanakml/flowdesk-migrator@sha256:6666666666666666666666666666666666666666666666666666666666666666"
+      "ghcr.io/ryanakml/wabrix-migrator@sha256:6666666666666666666666666666666666666666666666666666666666666666"
   };
 
   describe("deploy-workload.sh", () => {
@@ -899,27 +899,41 @@ describe("Production Deployment Scripts Integration Tests (M5-07 / #181, #203, #
       }).toThrow(/Production promotion strictly requires an immutable 40-character commit SHA/);
     });
 
-    it("generates verified sha256 digests file in mock mode", () => {
+    it.each(["wabrix", "flowdesk"])("verifies six digests in the %s image family", (family) => {
       const outFile = path.join(os.tmpdir(), "provenance-test-" + Date.now() + ".json");
       const sha = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
-      execFileSync(provenanceScript, [sha, outFile], {
-        cwd: repoRoot,
-        encoding: "utf8",
-        env: {
-          ...process.env,
-          FLOWDESK_MOCK_PROVENANCE: "true"
+      execFileSync(
+        provenanceScript,
+        family === "wabrix" ? [sha, outFile] : [sha, outFile, family],
+        {
+          cwd: repoRoot,
+          encoding: "utf8",
+          env: {
+            ...process.env,
+            FLOWDESK_MOCK_PROVENANCE: "true"
+          }
         }
-      });
+      );
 
       const record = JSON.parse(fs.readFileSync(outFile, "utf8")) as ProvenanceRecord;
       expect(record.sourceSha).toBe(sha);
       const services = ["web", "api", "ingress", "worker", "scheduler", "migrator"];
       for (const svc of services) {
         expect(record.digests[svc]).toMatch(
-          /^ghcr\.io\/ryanakml\/flowdesk-[a-z]+@sha256:[0-9a-f]{64}$/
+          new RegExp(`^ghcr[.]io/ryanakml/${family}-${svc}@sha256:[0-9a-f]{64}$`)
         );
       }
       fs.unlinkSync(outFile);
+    });
+
+    it("rejects candidates and unknown image families", () => {
+      const sha = "a".repeat(40);
+      expect(() => execFileSync(provenanceScript, ["candidate-" + sha], { stdio: "pipe" })).toThrow(
+        /immutable 40-character commit SHA/
+      );
+      expect(() => execFileSync(provenanceScript, [sha, "", "other"], { stdio: "pipe" })).toThrow(
+        /Image family must be wabrix or flowdesk/
+      );
     });
   });
 

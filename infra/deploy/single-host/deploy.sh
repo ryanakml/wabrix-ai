@@ -82,9 +82,16 @@ rollback() {
   exit_code=$?
   dump_diagnostics
   if [[ -n ${previous_tag} && ${previous_tag} =~ ^[0-9a-f]{40}$ ]]; then
-    echo "deployment failed; rolling application containers back to ${previous_tag}" >&2
-    export IMAGE_TAG=${previous_tag}
-    "${compose[@]}" up -d --no-build --remove-orphans "${app_services[@]}" caddy || true
+    previous_release_dir="$(dirname -- "${release_dir}")/${previous_tag}"
+    if [[ -f ${previous_release_dir}/compose.yaml ]]; then
+      echo "deployment failed; rolling application containers back using release ${previous_tag}'s Compose manifest" >&2
+      IMAGE_TAG=${previous_tag} docker compose --env-file "${environment_file}" \
+        -f "${previous_release_dir}/compose.yaml" \
+        up -d --no-build --remove-orphans "${app_services[@]}" caddy || \
+        echo "rollback failed; inspect release ${previous_tag} and its image availability" >&2
+    else
+      echo "rollback unavailable: missing ${previous_release_dir}/compose.yaml" >&2
+    fi
   fi
   exit "${exit_code}"
 }

@@ -73,7 +73,7 @@ if [[ "${FLOWDESK_MOCK_COMPUTE_CONTROLLER:-false}" == "true" ]]; then
     // Simulate digest mismatch if requested by test
     let runningDigests = { ...digests };
     if (process.env.MOCK_DIGEST_MISMATCH === 'true') {
-      runningDigests['api'] = 'ghcr.io/ryanakml/flowdesk-api@sha256:0000000000000000000000000000000000000000000000000000000000000000';
+      runningDigests['api'] = 'ghcr.io/ryanakml/wabrix-api@sha256:0000000000000000000000000000000000000000000000000000000000000000';
     }
 
     // Verify running digest matches expected

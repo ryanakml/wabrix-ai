@@ -102,35 +102,35 @@ services:
 
   web:
     <<: *app-defaults
-    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/flowdesk-web:${IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/wabrix-web:${IMAGE_TAG}
     environment:
       <<: *app-environment
       PORT: "3000"
 
   api:
     <<: *app-defaults
-    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/flowdesk-api:${IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/wabrix-api:${IMAGE_TAG}
     environment:
       <<: [*app-environment, *api-meta-environment]
       PORT: "4000"
 
   ingress:
     <<: *app-defaults
-    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/flowdesk-ingress:${IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/wabrix-ingress:${IMAGE_TAG}
     environment:
       <<: [*app-environment, *ingress-webhook-environment]
       PORT: "4001"
 
   worker:
     <<: *app-defaults
-    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/flowdesk-worker:${IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/wabrix-worker:${IMAGE_TAG}
     environment:
       <<: [*app-environment, *worker-ai-environment]
       PORT: "4002"
 
   scheduler:
     <<: *app-defaults
-    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/flowdesk-scheduler:${IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/wabrix-scheduler:${IMAGE_TAG}
     environment:
       <<: *app-environment
       PORT: "4003"
@@ -218,7 +218,7 @@ services:
       retries: 40
 
   migrate:
-    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/flowdesk-migrator:${IMAGE_TAG}
+    image: ${IMAGE_REGISTRY:-ghcr.io/ryanakml}/wabrix-migrator:${IMAGE_TAG}
     restart: "no"
     environment:
       DATABASE_MIGRATOR_URL: "postgresql://${POSTGRES_USER:-flowdesk_bootstrap}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-flowdesk_staging}"

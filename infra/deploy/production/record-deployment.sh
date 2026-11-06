@@ -38,6 +38,7 @@ const actor = '${ACTOR}';
 const digestsPath = '${DIGESTS_FILE}';
 const deployedPath = '${DEPLOYED_DIGESTS_FILE}';
 const failedStage = '${FAILED_STAGE}';
+const imageFamily = process.env.IMAGE_FAMILY === 'flowdesk' ? 'flowdesk' : 'wabrix';
 
 let expectedDigests = {};
 if (fs.existsSync(digestsPath)) {
@@ -69,7 +70,7 @@ for (const app of requiredApps) {
       console.error('::error::Missing immutable expected digest for service: ' + app);
       process.exit(1);
     } else {
-      expectedDigests[app] = 'ghcr.io/ryanakml/flowdesk-' + app + '@sha256:unresolved';
+      expectedDigests[app] = 'ghcr.io/ryanakml/' + imageFamily + '-' + app + '@sha256:unresolved';
     }
   }
   if (!deployedDigests[app]) {
